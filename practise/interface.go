@@ -28,8 +28,24 @@ func InterfaceTest() {
 	// 所以值对象human其实是不能调用eat方法的，之所以Human{"shindou"}.eat()不报错是因为go编译时自动转化成&Human{"shindou"}.eat()
 	livingEat(&Human{"shindou"})
 	livingEat(Bird{})
+
+	var man1, man2 = Human{"name1"}, &Human{"name2"}
+	fmt.Println("before enter func", man1, man2)
+	receiverWithoutPointer(man1)
+	//receiverWithPointer(man1)// 编译错误
+	//receiverWithoutPointer(man2)// 编译错误
+	receiverWithPointer(man2)
+	fmt.Println("after enter func", man1, man2)
 }
 
 func livingEat(living Living) {
 	fmt.Println(living.eat())
+}
+
+func receiverWithPointer(human *Human) {
+	human.name = "receiverWithPointer"
+}
+
+func receiverWithoutPointer(human Human) {
+	human.name = "receiverWithPointer"
 }
