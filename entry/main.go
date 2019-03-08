@@ -1,12 +1,7 @@
 package main
 
-import "github.com/hoisie/web"
-
-func hello(val string) string {
-	return "hello " + val
-}
+import "goland/practise"
 
 func main() {
-	web.Get("/(.*)", hello)
-	web.Run("0.0.0.0:9999")
+	practise.InterfaceTest()
 }
