@@ -110,6 +110,10 @@ func grayscale(code color.Attribute) func(string, ...interface{}) string {
 
 func main() {
 	flag.Parse()
+	httpHeaders = []string{
+		"Date:Mon, 11 Mar 2019 01:17:25 GMT",
+		"Proxy-User:linqh",
+		"Authorization:Basic bXMtcG9ydGFsOmZsWVNOU3AyeWt5a0RISXc4RWg3QWhkVVJ1Zz0="}
 
 	if showVersion {
 		fmt.Printf("%s %s (runtime: %s)\n", os.Args[0], version, runtime.Version())
