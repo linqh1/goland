@@ -16,6 +16,9 @@ func main() {
 		DNSDone: func(dnsInfo httptrace.DNSDoneInfo) {
 			fmt.Printf("DNS Info: %+v\n", dnsInfo.Addrs)
 		},
+		GotConn: func(connInfo httptrace.GotConnInfo) {
+			fmt.Printf("target ip:%+v\n", connInfo.Conn.RemoteAddr().String())
+		},
 	}
 	request = request.WithContext(httptrace.WithClientTrace(request.Context(), trace))
 	tr := &http.Transport{
