@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptrace"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"path"
@@ -296,6 +297,8 @@ func visit(url *url.URL) {
 		},
 	}
 
+	requestBytes, err := httputil.DumpRequest(req, true)
+	fmt.Print(string(requestBytes))
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Fatalf("failed to read response: %v", err)
