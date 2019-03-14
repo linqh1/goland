@@ -149,7 +149,9 @@ type Pinger struct {
 	// OnIdle is called when MaxRTT time passed
 	OnIdle func()
 	// If Debug is true, it prints debug messages to stdout.
-	Debug bool
+	Debug          bool
+	OnICMPResponse func(message icmp.Message)
+	OnTimeout      func(conn *icmp.PacketConn)
 }
 
 // NewPinger returns a new Pinger struct pointer
@@ -573,6 +575,7 @@ func (p *Pinger) recvICMP(conn *icmp.PacketConn, recv chan<- *packet, ctx *conte
 			if neterr, ok := err.(*net.OpError); ok {
 				if neterr.Timeout() {
 					p.debugln("recvICMP(): Read Timeout")
+					p.OnTimeout(conn)
 					continue
 				} else {
 					p.debugln("recvICMP(): OpError happen", err)
@@ -640,6 +643,8 @@ func (p *Pinger) procRecv(recv *packet, queue map[string]*net.IPAddr) {
 	if m, err = icmp.ParseMessage(proto, bytes); err != nil {
 		return
 	}
+
+	p.OnICMPResponse(*m)
 
 	if m.Type != ipv4.ICMPTypeEchoReply && m.Type != ipv6.ICMPTypeEchoReply {
 		return
