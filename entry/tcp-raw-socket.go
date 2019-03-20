@@ -36,7 +36,7 @@ func main() {
 		log.Fatalf("Dial: %s\n", err)
 	}
 	defer conn.Close()
-	_, err = conn.Write(data)
+	_, err = conn.Write(data) //在这一步过程中，如果受到目标机器返回的SYN-ACK包之后，会自动发送一个RST包给目标机器
 	if err != nil {
 		log.Fatal("write error", err)
 	}
@@ -147,12 +147,14 @@ func (tcp *TCPHeader) Marshal() []byte {
 // TCP Checksum
 func Csum(data []byte, srcip, dstip [4]byte) uint16 {
 
+	//伪头部,计算校验和的时候使用的,结构如下
+	//源IP(4个字节) 目标ip(4个字节) 0(1个字节) 协议类型(1个字节) TCP数据长度(2个字节)
 	pseudoHeader := []byte{
 		srcip[0], srcip[1], srcip[2], srcip[3],
 		dstip[0], dstip[1], dstip[2], dstip[3],
 		0,                  // zero
 		6,                  // protocol number (6 == TCP)
-		0, byte(len(data)), // TCP length (16 bits), not inc pseudo header
+		0, byte(len(data)), // TCP length (16 bits), not inc pseudo header 这里的TCP数据长度前8位为什么设置为0???
 	}
 
 	sumThis := make([]byte, 0, len(pseudoHeader)+len(data))
@@ -168,14 +170,14 @@ func Csum(data []byte, srcip, dstip [4]byte) uint16 {
 		sum += uint32(nextWord)
 	}
 	if lenSumThis%2 != 0 {
-		//fmt.Println("Odd byte")
+		fmt.Println("Odd byte")
 		sum += uint32(sumThis[len(sumThis)-1])
 	}
 
 	// Add back any carry, and any carry from adding the carry
 	sum = (sum >> 16) + (sum & 0xffff)
 	sum = sum + (sum >> 16)
-
+	fmt.Printf("checksum:%v\n", uint16(^sum))
 	// Bitwise complement
 	return uint16(^sum)
 }
