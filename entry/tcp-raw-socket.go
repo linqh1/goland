@@ -29,15 +29,15 @@ func main() {
 		Options:     []TCPOption{},
 	}
 
-	data := packet.Marshal()
-	packet.Checksum = Csum(data, [4]byte{192, 168, 51, 128}, [4]byte{10, 8, 156, 137})
-	data = packet.Marshal()
-
 	conn, err := net.Dial("ip4:tcp", "10.8.156.137")
 	if err != nil {
 		log.Fatalf("Dial: %s\n", err)
 	}
 	defer conn.Close()
+
+	data := packet.Marshal()
+	packet.Checksum = Csum(data, parseToIp4(conn.LocalAddr().String()), [4]byte{10, 8, 156, 137})
+	data = packet.Marshal()
 	_, err = conn.Write(data) //在这一步过程中，如果受到目标机器返回的SYN-ACK包之后，会自动发送一个RST包给目标机器
 	if err != nil {
 		log.Fatal("write error", err)
@@ -188,4 +188,16 @@ func Csum(data []byte, srcip, dstip [4]byte) uint16 {
 	fmt.Printf("checksum:%v\n", uint16(^sum))
 	// Bitwise complement
 	return uint16(^sum)
+}
+
+func parseToIp4(ip string) [4]byte {
+	addr := net.ParseIP(ip)
+	if addr == nil {
+		panic("can not recongnize ip" + ip)
+	}
+	addr = addr.To4()
+	if addr == nil {
+		panic("can only support ipv4" + ip)
+	}
+	return [4]byte{addr[0], addr[1], addr[2], addr[3]}
 }
