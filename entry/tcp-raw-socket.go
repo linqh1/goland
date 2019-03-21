@@ -9,12 +9,14 @@ import (
 	"log"
 	"math/rand"
 	"net"
+	"time"
 )
 
 func main() {
+	rand.Seed(time.Now().UnixNano()) //实现真正的随机数
 	packet := TCPHeader{
 		Source:      0xaa47, // Random ephemeral port
-		Destination: 8090,
+		Destination: 8090,   //这里的端口可能需要修改一下
 		SeqNum:      rand.Uint32(),
 		AckNum:      0,
 		DataOffset:  5,      // 4 bits
@@ -41,11 +43,17 @@ func main() {
 		log.Fatal("write error", err)
 	}
 	bytes := make([]byte, 4096)
-	readnum, err := conn.Read(bytes)
+	conn.SetReadDeadline(time.Now().Add(time.Second * 5))
+	readnum, err := conn.Read(bytes) //这里似乎不会收到10.8.156.137这个的地址发来的数据?
 	if err != nil {
-		log.Fatal("read error", err)
+		fmt.Printf("read error:%v\n", err)
+		return
 	}
 	fmt.Print(hex.Dump(bytes[:readnum]))
+	ipheaderLenth := bytes[:readnum][0] & 0x0f                //第1个字节低4位表示ip头长度，单位是32bit，即4字节
+	header := NewTCPHeader(bytes[:readnum][ipheaderLenth*4:]) //收到的TCP包,包中的SYN和ACK标志都应该为1,并且ACKNum应该为发送包seq+1
+	fmt.Printf("send seq:%v, receive ack:%v\n", packet.SeqNum, header.AckNum)
+	fmt.Printf("receive tcp packet,syn:%v,ack:%v\n", (header.Ctrl&0x02)>>1, (header.Ctrl&0x10)>>4)
 
 }
 
