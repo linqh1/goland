@@ -9,12 +9,14 @@ import (
 	"log"
 	"math/rand"
 	"net"
+	"time"
 )
 
 func main() {
+	rand.Seed(time.Now().UnixNano()) //实现真正的随机数
 	packet := TCPHeader{
 		Source:      0xaa47, // Random ephemeral port
-		Destination: 8090,
+		Destination: 8090,   //这里的端口可能需要修改一下
 		SeqNum:      rand.Uint32(),
 		AckNum:      0,
 		DataOffset:  5,      // 4 bits
@@ -27,25 +29,31 @@ func main() {
 		Options:     []TCPOption{},
 	}
 
-	data := packet.Marshal()
-	packet.Checksum = Csum(data, [4]byte{192, 168, 51, 128}, [4]byte{10, 8, 156, 137})
-	data = packet.Marshal()
-
 	conn, err := net.Dial("ip4:tcp", "10.8.156.137")
 	if err != nil {
 		log.Fatalf("Dial: %s\n", err)
 	}
 	defer conn.Close()
-	_, err = conn.Write(data)
+
+	data := packet.Marshal()
+	packet.Checksum = Csum(data, parseToIp4(conn.LocalAddr().String()), [4]byte{10, 8, 156, 137})
+	data = packet.Marshal()
+	_, err = conn.Write(data) //在这一步过程中，如果受到目标机器返回的SYN-ACK包之后，会自动发送一个RST包给目标机器
 	if err != nil {
 		log.Fatal("write error", err)
 	}
 	bytes := make([]byte, 4096)
-	readnum, err := conn.Read(bytes)
+	conn.SetReadDeadline(time.Now().Add(time.Second * 5))
+	readnum, err := conn.Read(bytes) //这里似乎不会收到10.8.156.137这个的地址发来的数据?
 	if err != nil {
-		log.Fatal("read error", err)
+		fmt.Printf("read error:%v\n", err)
+		return
 	}
 	fmt.Print(hex.Dump(bytes[:readnum]))
+	ipheaderLenth := bytes[:readnum][0] & 0x0f                //第1个字节低4位表示ip头长度，单位是32bit，即4字节
+	header := NewTCPHeader(bytes[:readnum][ipheaderLenth*4:]) //收到的TCP包,包中的SYN和ACK标志都应该为1,并且ACKNum应该为发送包seq+1
+	fmt.Printf("send seq:%v, receive ack:%v\n", packet.SeqNum, header.AckNum)
+	fmt.Printf("receive tcp packet,syn:%v,ack:%v,rst:%v \n", (header.Ctrl&0x02)>>1, (header.Ctrl&0x10)>>4, (header.Ctrl&0x04)>>2)
 
 }
 
@@ -147,12 +155,14 @@ func (tcp *TCPHeader) Marshal() []byte {
 // TCP Checksum
 func Csum(data []byte, srcip, dstip [4]byte) uint16 {
 
+	//伪头部,计算校验和的时候使用的,结构如下
+	//源IP(4个字节) 目标ip(4个字节) 0(1个字节) 协议类型(1个字节) TCP数据长度(2个字节)
 	pseudoHeader := []byte{
 		srcip[0], srcip[1], srcip[2], srcip[3],
 		dstip[0], dstip[1], dstip[2], dstip[3],
 		0,                  // zero
 		6,                  // protocol number (6 == TCP)
-		0, byte(len(data)), // TCP length (16 bits), not inc pseudo header
+		0, byte(len(data)), // TCP length (16 bits), not inc pseudo header 这里的TCP数据长度前8位为什么设置为0???
 	}
 
 	sumThis := make([]byte, 0, len(pseudoHeader)+len(data))
@@ -168,14 +178,26 @@ func Csum(data []byte, srcip, dstip [4]byte) uint16 {
 		sum += uint32(nextWord)
 	}
 	if lenSumThis%2 != 0 {
-		//fmt.Println("Odd byte")
+		fmt.Println("Odd byte")
 		sum += uint32(sumThis[len(sumThis)-1])
 	}
 
 	// Add back any carry, and any carry from adding the carry
 	sum = (sum >> 16) + (sum & 0xffff)
 	sum = sum + (sum >> 16)
-
+	fmt.Printf("checksum:%v\n", uint16(^sum))
 	// Bitwise complement
 	return uint16(^sum)
+}
+
+func parseToIp4(ip string) [4]byte {
+	addr := net.ParseIP(ip)
+	if addr == nil {
+		panic("can not recongnize ip" + ip)
+	}
+	addr = addr.To4()
+	if addr == nil {
+		panic("can only support ipv4" + ip)
+	}
+	return [4]byte{addr[0], addr[1], addr[2], addr[3]}
 }
