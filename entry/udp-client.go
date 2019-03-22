@@ -49,6 +49,8 @@ func main() {
 			fmt.Println("received icmp message")
 			fmt.Println(addr.String())
 			fmt.Print(hex.Dump(icmpmsg[:i]))
+			//注意：这里似乎会接受到所有的ICMP报文，并不只是刚才发送的UDP请求对应的ICMP报文
+			//TODO 校验接收到的icmp是否匹配上次请求
 			hanlderICMPPacked(icmpmsg[:i])
 		}
 	} else {
