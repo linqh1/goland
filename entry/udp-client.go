@@ -44,7 +44,7 @@ func main() {
 		// 注意：ICMP响应报文通常情况下会被拦截
 		i, addr, err := packetConn.ReadFrom(icmpmsg)
 		if err != nil {
-			fmt.Printf("ReadFrom UDP ERROR:%v\n", err.Error())
+			fmt.Printf("read icmp message error:%v\n", err.Error())
 		} else {
 			fmt.Println("received icmp message")
 			fmt.Println(addr.String())
