@@ -53,7 +53,7 @@ func main() {
 	ipheaderLenth := bytes[:readnum][0] & 0x0f                //第1个字节低4位表示ip头长度，单位是32bit，即4字节
 	header := NewTCPHeader(bytes[:readnum][ipheaderLenth*4:]) //收到的TCP包,包中的SYN和ACK标志都应该为1,并且ACKNum应该为发送包seq+1
 	fmt.Printf("send seq:%v, receive ack:%v\n", packet.SeqNum, header.AckNum)
-	fmt.Printf("receive tcp packet,syn:%v,ack:%v\n", (header.Ctrl&0x02)>>1, (header.Ctrl&0x10)>>4)
+	fmt.Printf("receive tcp packet,syn:%v,ack:%v,rst:%v \n", (header.Ctrl&0x02)>>1, (header.Ctrl&0x10)>>4, (header.Ctrl&0x04)>>2)
 
 }
 
