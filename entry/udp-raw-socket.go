@@ -1,4 +1,4 @@
-// 只在linux下能编译成功
+// 该方法似乎无法接受到ICMP报文
 package main
 
 import (
