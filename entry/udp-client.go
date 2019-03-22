@@ -39,6 +39,7 @@ func main() {
 	n, err = conn.Read(msg)
 	if err != nil {
 		icmpmsg := make([]byte, 1024)
+		fmt.Println("read udp error" + err.Error())
 		packetConn.SetReadDeadline(time.Now().Add(time.Second))
 		// 注意：ICMP响应报文通常情况下会被拦截
 		i, addr, err := packetConn.ReadFrom(icmpmsg)
