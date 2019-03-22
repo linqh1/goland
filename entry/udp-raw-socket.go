@@ -6,15 +6,18 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"golang.org/x/net/icmp"
 	"log"
 	"math/rand"
 	"net"
+	"strings"
 	"time"
 )
 
 func main() {
 	rand.Seed(time.Now().UnixNano()) //实现真正的随机数
 	listenPort := 0xaa47
+	destinationip := "10.8.227.27"
 	packet := UDPHeader{
 		Source:      uint16(listenPort), // Random ephemeral port
 		Destination: 10006,              //这里的端口可能需要修改一下
@@ -23,7 +26,7 @@ func main() {
 		Data:        []byte("i'm from vmware"),
 	}
 
-	conn, err := net.Dial("ip4:udp", "10.8.156.137")
+	conn, err := net.Dial("ip4:udp", destinationip)
 	if err != nil {
 		log.Fatalf("Dial: %s\n", err)
 	}
@@ -38,9 +41,17 @@ func main() {
 	}
 	defer udpConn.Close()
 
+	// 监听icmp报文,在获取udp报文超时的时候,接收icmp报文
+	fmt.Printf("listen %v icmp\n", conn.LocalAddr().String())
+	packetConn, err := icmp.ListenPacket("ip4:icmp", conn.LocalAddr().String())
+	if err != nil {
+		panic("ListenPacket Error:" + err.Error())
+	}
+	defer packetConn.Close()
+
 	packet.DataOffset = uint16(8 + len(packet.Data))
 	data := packet.Marshal()
-	packet.Checksum = UDPChecksum(data, parseToIp4Byte(conn.LocalAddr().String()), [4]byte{10, 8, 156, 137})
+	packet.Checksum = UDPChecksum(data, parseToIp4Byte(conn.LocalAddr().String()), parseToIp4Byte(destinationip))
 	data = packet.Marshal()
 	_, err = conn.Write(data)
 	if err != nil {
@@ -48,9 +59,14 @@ func main() {
 	}
 	bytes := make([]byte, 4096)
 	conn.SetReadDeadline(time.Now().Add(time.Second * 5))
+	//这里有时候会返回timeout，有时会立即返回connection refuse，不知道为什么。
+	//upd-client的就不会 = =
 	readnum, err := conn.Read(bytes)
 	if err != nil {
-		fmt.Printf("read error:%v\n", err)
+		fmt.Printf("read udp message error:%v\n", err)
+		complete := make(chan int)
+		go receieveICMPPacked(packetConn, complete)
+		<-complete
 		return
 	}
 	fmt.Print(hex.Dump(bytes[:readnum]))
@@ -60,6 +76,45 @@ func main() {
 	fmt.Println(hex.Dump(udpdata))
 	fmt.Println("udp data:")
 	fmt.Println(string(udpdata[8:]))
+}
+
+func receieveICMPPacked(packetConn *icmp.PacketConn, complete chan int) {
+	//如果读取出错（超时）,那么就尝试获取以下icmp报文
+	//可以用go程来做?
+	// 注意：ICMP响应报文通常情况下会被拦截
+	errorTimeLimit := 10
+	errorCnt := 0
+	for {
+		icmpmsg := make([]byte, 1024)
+		packetConn.SetReadDeadline(time.Now().Add(time.Second * 2))
+		i, addr, err := packetConn.ReadFrom(icmpmsg)
+		if err != nil {
+			fmt.Printf("read icmp messge error:%v\n", err.Error())
+			if strings.Index(err.Error(), "i/o timeout") >= 0 {
+				complete <- 1
+				break
+			} else {
+				//防止死循环
+				errorCnt = errorCnt + 1
+				if errorCnt > errorTimeLimit {
+					complete <- 1
+					break
+				}
+			}
+		} else {
+			fmt.Println("received icmp message")
+			fmt.Println(addr.String())
+			fmt.Print(hex.Dump(icmpmsg[:i]))
+			icmpbytes := icmpmsg[:i]
+			itype := icmpbytes[0]
+			icode := icmpbytes[1]
+			ichecksum := int(icmpbytes[2])*256 + int(icmpbytes[3])
+			fmt.Printf("icmp type:%v\n", itype)
+			fmt.Printf("icmp code:%v\n", icode)
+			fmt.Printf("icmp checksum:%v\n", ichecksum)
+			// TODO 这里要做校验:如果接收到的icmp报文就是响应我们刚才的请求的话就结束循环
+		}
+	}
 }
 
 type UDPHeader struct {
