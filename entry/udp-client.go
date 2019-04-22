@@ -24,6 +24,7 @@ func main() {
 	defer conn.Close()
 
 	ipport := conn.LocalAddr().String()
+	// 经测试，该方法在Linux下能够监听到所有的icmp包，但是在windows下似乎监听不到外部请求的icmp响应包（如:通过外部ping得到的icmp响应包就监听不到）
 	packetConn, err := icmp.ListenPacket("ip4:icmp", ipport[:strings.LastIndex(ipport, ":")])
 	if err != nil {
 		panic("ListenPacket Error:" + err.Error())
