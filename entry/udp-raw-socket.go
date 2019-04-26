@@ -16,7 +16,7 @@ import (
 
 func main() {
 	rand.Seed(time.Now().UnixNano()) //实现真正的随机数
-	listenPort := 0xaa47
+	listenPort := 61500
 	destinationip := "10.8.227.27"
 	packet := UDPHeader{
 		Source:      uint16(listenPort), // Random ephemeral port
@@ -147,8 +147,14 @@ func UDPChecksum(msg []byte, srcip, dstip [4]byte) uint16 {
 	sumThis = append(sumThis, pseudoHeader...)
 	sumThis = append(sumThis, msg...)
 	var sum uint32
-	for n := 1; n < len(sumThis)-1; n += 2 {
-		sum += uint32(sumThis[n])*256 + uint32(sumThis[n+1])
+	var nextWord uint32
+	for n := 0; n < len(sumThis)-1; n += 2 {
+		nextWord = uint32(sumThis[n])<<8 | uint32(sumThis[n+1])
+		sum += uint32(nextWord)
+	}
+	if len(sumThis)%2 != 0 {
+		lastByte := uint16(sumThis[len(sumThis)-1]) << 8
+		sum += uint32(lastByte)
 	}
 	sum = (sum >> 16) + (sum & 0xffff)
 	sum = sum + (sum >> 16)
