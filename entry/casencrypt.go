@@ -22,6 +22,7 @@ var (
 	apikey          string
 	keyUserSet      []EncryptSet
 	DefaultFilePath = "casencrypt-default.config"
+	BinaryFilePath  string
 )
 
 type EncryptSet struct {
@@ -41,6 +42,11 @@ func init() {
 	keyUserSet = make([]EncryptSet, 0)
 	dir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
 	DefaultFilePath = filepath.Join(dir, DefaultFilePath)
+	ex, err := os.Executable()
+	if err != nil {
+		panic(err)
+	}
+	BinaryFilePath = filepath.Join(filepath.Dir(ex), "casencrypt-default.config")
 }
 
 func main() {
@@ -54,8 +60,14 @@ func main() {
 	}
 
 	if confFile == "" && len(keyUserSet) == 0 {
-		fmt.Printf("no flag provided. use default config: %v\n", DefaultFilePath)
 		confFile = DefaultFilePath
+		_, err := os.Stat(confFile)
+		if err == nil {
+			fmt.Printf("no flag provided. use default config: %v\n", DefaultFilePath)
+		} else if os.IsNotExist(err) {
+			fmt.Printf("no flag provided. use default config: %v\n", BinaryFilePath)
+			confFile = BinaryFilePath
+		}
 	}
 
 	if confFile != "" {
